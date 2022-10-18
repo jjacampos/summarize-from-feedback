@@ -15,6 +15,12 @@ Supported platform: Python 3.7 64-bit on Ubuntu 18.04
   pipenv install
   ```
 
+## Run the reward model with a personal dataset (It expects the format of the Surge annotations)
+
+```
+pipenv run exps/eval_rm_ours.py rmours eval-rm4 --input_path `[path where the Surge annotations are stored]`
+```
+
 ## Run the models
 
 You'll need to run this on a machine with an Nvidia GPU.

@@ -8,6 +8,7 @@ import blobfile as bf
 import torch
 
 import summarize_from_feedback
+import jsonlines
 from summarize_from_feedback import tasks
 from summarize_from_feedback.datasets import jsonl_encoding, get_dataset
 from summarize_from_feedback.model_layout import ModelLayout
@@ -94,6 +95,45 @@ def get_iter_for_task(
     )
     return ds
 
+
+def from_ours(
+    input_file,
+    task_H,
+    encoder=summarize_from_feedback.encoder,
+    all_fields=False,
+):
+    response_encoder = tasks.ResponseEncoder(task_H.response, encoder)
+
+    ds = jsonlines.open(input_file)
+    output = []
+    for elem in ds:
+        ref = f" {elem['ideal_human_summary']}"
+        ref_tokens = response_encoder.encode_response(ref, allow_truncate=True)
+        formated_A = f" {elem['generated_summary_A']}"
+        formated_B = f" {elem['generated_summary_B']}"
+        if 'A' in elem['comparison_preference']:
+            samples = [formated_A, formated_B]
+        else:
+            samples = [formated_B, formated_A]
+
+        samples.append(ref)
+        sample_tokens = []
+        for sample in samples:
+            sample_tokens.append(response_encoder.encode_response(sample, allow_truncate=True))
+        context_tokens = tasks.process_query(elem, encoder=encoder, hparams=task_H.query)['tokens']
+        context = task_H.query.format_str.format(**elem)
+        output.append({'context': context,
+                       'context_tokens': context_tokens,
+                       'samples': samples,
+                       'sample_tokens': sample_tokens,
+                       'ref': ref,
+                       'ref_tokens': ref_tokens
+                       })
+
+    with jsonlines.open(os.path.dirname(input_file) + '/samples.0.jsonl', 'w') as writer:
+        for elem in output:
+            writer.write(jsonl_encoding.encode_example(elem))
+    
 
 def make_jsonl_samples_iter(input_path, layout: Optional[ModelLayout] = None):
     """
